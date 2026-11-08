@@ -118,9 +118,14 @@ public class AudioPlayerManager: NSObject, ObservableObject {
             self.updateNowPlayingInfo()
         }
 
+        applyEqSettings()
         player?.play()
         self.isPlaying = true
         updateNowPlayingInfo()
+    }
+
+    public func applyEqSettings() {
+        player?.volume = EqManager.shared.linearGainMultiplier
     }
 
     public func togglePlay() {

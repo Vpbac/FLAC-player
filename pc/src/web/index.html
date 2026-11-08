@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Hi-Res FLAC Player</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Hi-Res FLAC">
+  <meta name="theme-color" content="#0d0e12">
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0d0e12;
+      color: #fff;
+      user-select: none;
+      -webkit-user-select: none;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    header {
+      padding: 14px 18px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #14161d;
+      border-bottom: 1px solid #232733;
+      z-index: 10;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #4cc2ff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .refresh-btn {
+      background: #232733;
+      color: #bbb;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .refresh-btn:active { background: #33384a; color: #fff; }
+    .search-box {
+      width: 100%;
+      background: #1e222d;
+      border: 1px solid #2d3345;
+      color: #fff;
+      padding: 9px 14px;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+    }
+    .search-box::placeholder { color: #6b7280; }
+
+    /* Track list */
+    #tracklist {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 8px 12px 90px;
+    }
+    .track-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-bottom: 4px;
+      transition: background 0.15s;
+    }
+    .track-item:active { background: #1c202a; }
+    .track-item.active { background: #18283a; border-left: 3px solid #4cc2ff; }
+    .track-num {
+      font-size: 13px;
+      font-weight: 600;
+      color: #6b7280;
+      width: 24px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .track-item.active .track-num { color: #4cc2ff; }
+    .track-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .track-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-item.active .track-title { color: #4cc2ff; }
+    .track-sub {
+      font-size: 12px;
+      color: #9aa0a6;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid #555;
+      color: #9aa0a6;
+      text-transform: uppercase;
+    }
+    .badge.hires { border-color: #f5c542; color: #f5c542; }
+    .badge.saved { border-color: #3dd68c; color: #3dd68c; }
+    .offline-banner {
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: #1a2421;
+      color: #3dd68c;
+      border: 1px solid #284237;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .offline-banner.offline-mode {
+      background: #2b2218;
+      color: #f5c542;
+      border-color: #4a3820;
+    }
+    .track-dur {
+      font-size: 12px;
+      color: #6b7280;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Mini player */
+    #mini-player {
+      position: fixed;
+      bottom: calc(env(safe-area-inset-bottom) + 10px);
+      left: 12px;
+      right: 12px;
+      height: 60px;
+      background: #1a1e28;
+      border: 1px solid #2b3244;
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      padding: 8px 14px;
+      gap: 12px;
+      z-index: 100;
+      cursor: pointer;
+    }
+    .mini-cover {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #2b3244;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: #6b7280;
+      overflow: hidden;
+    }
+    .mini-cover img { width: 100%; height: 100%; object-fit: cover; }
+    .mini-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .mini-title {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mini-sub {
+      font-size: 12px;
+      color: #9aa0a6;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mini-btns {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+    }
+
+    /* Full Now Playing Modal */
+    #now-playing {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(180deg, #181c25 0%, #0d0e12 100%);
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: calc(env(safe-area-inset-top) + 16px) 24px calc(env(safe-area-inset-bottom) + 24px);
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    #now-playing.open { transform: translateY(0); }
+    .dismiss-bar {
+      width: 40px;
+      height: 5px;
+      background: #3b4254;
+      border-radius: 3px;
+      margin-bottom: 20px;
+      cursor: pointer;
+    }
+    .full-cover {
+      width: min(72vw, 300px);
+      height: min(72vw, 300px);
+      border-radius: 18px;
+      background: #1e222d;
+      box-shadow: 0 16px 36px rgba(0,0,0,0.6);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 80px;
+      color: #3b4254;
+      margin-bottom: 24px;
+    }
+    .full-cover img { width: 100%; height: 100%; object-fit: cover; }
+    .full-info {
+      width: 100%;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .full-title {
+      font-size: 20px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+    .full-artist {
+      font-size: 15px;
+      color: #4cc2ff;
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .full-badges {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    /* Scrubber slider */
+    .scrubber-container {
+      width: 100%;
+      margin-bottom: 16px;
+    }
+    .scrubber {
+      width: 100%;
+      -webkit-appearance: none;
+      height: 5px;
+      border-radius: 3px;
+      background: #2a303f;
+      outline: none;
+    }
+    .scrubber::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+    }
+    .time-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Controls */
+    .full-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .play-circle {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #4cc2ff;
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(76,194,255,0.4);
+    }
+    .play-circle:active { transform: scale(0.95); }
+    .active-toggle { color: #4cc2ff !important; }
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-top">
+      <div class="title">◉ Hi-Res FLAC</div>
+      <div style="display:flex; gap:8px;">
+        <button class="refresh-btn" id="eq-btn" onclick="openEqModal()" style="color:#f5c542;">🎚 AutoEQ</button>
+        <button class="refresh-btn" onclick="loadTracks()">Làm mới ↻</button>
+      </div>
+    </div>
+    <div id="offline-banner" class="offline-banner">
+      <span id="offline-status-text">🔄 Đang đồng bộ bộ nhớ Offline trên iPhone...</span>
+    </div>
+    <input type="text" id="search" class="search-box" placeholder="🔍 Tìm bài hát, nghệ sĩ..." oninput="renderTracks()">
+  </header>
+
+  <!-- Parametric EQ Modal -->
+  <div id="eq-modal" style="display:none; position:fixed; inset:0; background:rgba(10,12,16,0.96); z-index:300; flex-direction:column; padding:calc(env(safe-area-inset-top) + 16px) 18px 24px; overflow-y:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <div style="font-size:18px; font-weight:700; color:#4cc2ff;">🎚 Parametric EQ (Peace / AutoEQ)</div>
+      <button class="refresh-btn" onclick="closeEqModal()">Đóng ✕</button>
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:12px; align-items:center;">
+      <button class="refresh-btn" id="eq-toggle-btn" onclick="toggleEqEnabled()" style="background:#1f4e6e; color:#fff;">Bật / Tắt EQ</button>
+      <select id="eq-preset-select" onchange="selectEqPreset(this.value)" style="flex:1; background:#1e222d; color:#fff; border:1px solid #2d3345; padding:8px; border-radius:8px;">
+        <option value="flat">Flat (Mặc định)</option>
+        <option value="xm4">AutoEQ: Sony WH-1000XM4 (Harman)</option>
+        <option value="hd600">AutoEQ: Sennheiser HD600 (Harman)</option>
+        <option value="app2">AutoEQ: AirPods Pro 2 (Harman)</option>
+        <option value="aria">AutoEQ: Moondrop Aria / Blessing</option>
+        <option value="bass">Harman Bass Boost (+6.5dB)</option>
+        <option value="vocal">Audiophile Vocal & Air</option>
+      </select>
+    </div>
+    <div style="margin-bottom:10px; font-size:13px; color:#ccc;">
+      Preamp: <span id="eq-preamp-val">0.0</span> dB
+      <input type="range" id="eq-preamp" min="-15" max="6" step="0.5" value="0" style="width:100%; margin-top:4px;" oninput="onPreampChange(this.value)">
+    </div>
+    <div style="font-size:12px; color:#9aa0a6; margin-bottom:4px;">Dán cấu hình ParametricEQ.txt (chuẩn Peace EQ / AutoEQ):</div>
+    <textarea id="eq-text" rows="7" style="width:100%; background:#14161d; color:#3dd68c; border:1px solid #2d3345; border-radius:8px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:10px;">Preamp: -6.0 dB
+Filter 1: ON LSC Fc 105 Hz Gain 6.0 dB Q 0.70
+Filter 2: ON PK Fc 220 Hz Gain -1.5 dB Q 1.40
+Filter 3: ON PK Fc 3200 Hz Gain 2.0 dB Q 1.60
+Filter 4: ON HSC Fc 10000 Hz Gain 2.5 dB Q 0.70</textarea>
+    <button class="refresh-btn" onclick="applyEqFromText()" style="background:#3dd68c; color:#000; padding:10px; font-weight:700;">✔ Áp dụng cấu hình Parametric EQ</button>
+  </div>
+
+  <div id="tracklist"></div>
+
+  <!-- Mini player bar -->
+  <div id="mini-player" style="display:none;" onclick="openNowPlaying()">
+    <div class="mini-cover" id="mini-cover">♫</div>
+    <div class="mini-info">
+      <div class="mini-title" id="mini-title">Chưa phát</div>
+      <div class="mini-sub" id="mini-sub">FLAC Audio</div>
+    </div>
+    <div class="mini-btns" onclick="event.stopPropagation()">
+      <button class="icon-btn" onclick="togglePlay()"><span id="mini-play-icon">▶</span></button>
+      <button class="icon-btn" onclick="nextTrack()">⏭</button>
+    </div>
+  </div>
+
+  <!-- Full Now Playing sheet -->
+  <div id="now-playing">
+    <div class="dismiss-bar" onclick="closeNowPlaying()"></div>
+    <div class="full-cover" id="full-cover">♫</div>
+    <div class="full-info">
+      <div class="full-title" id="full-title">Chưa phát</div>
+      <div class="full-artist" id="full-artist">—</div>
+      <div class="full-badges" id="full-badges"></div>
+    </div>
+
+    <div class="scrubber-container">
+      <input type="range" id="scrubber" class="scrubber" min="0" max="100" value="0" oninput="onScrub(this.value)">
+      <div class="time-labels">
+        <span id="curr-time">0:00</span>
+        <span id="total-time">0:00</span>
+      </div>
+    </div>
+
+    <div class="full-controls">
+      <button class="icon-btn" id="btn-shuffle" onclick="toggleShuffle()">🔀</button>
+      <button class="icon-btn" style="font-size:28px;" onclick="prevTrack()">⏮</button>
+      <div class="play-circle" onclick="togglePlay()"><span id="full-play-icon">▶</span></div>
+      <button class="icon-btn" style="font-size:28px;" onclick="nextTrack()">⏭</button>
+      <button class="icon-btn" id="btn-repeat" onclick="toggleRepeat()">🔁</button>
+    </div>
+  </div>
+
+  <audio id="audio" preload="auto"></audio>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+
+    let tracks = [];
+    let currentIndex = -1;
+    let isShuffle = false;
+    let repeatMode = 1; // 0: off, 1: all, 2: one
+    let isScrubbing = false;
+    let isPcOnline = true;
+    let cachedPaths = new Set();
+    let isSyncingOffline = false;
+    let currentAudioObjectUrl = null;
+    let currentCoverObjectUrl = null;
+
+    const audio = document.getElementById('audio');
+    const tracklistEl = document.getElementById('tracklist');
+    const miniPlayer = document.getElementById('mini-player');
+    const nowPlaying = document.getElementById('now-playing');
+    const offlineBanner = document.getElementById('offline-banner');
+    const offlineStatusText = document.getElementById('offline-status-text');
+
+    // ---------------- IndexedDB Offline Storage ----------------
+    let dbPromise = null;
+    function openDB() {
+      if (dbPromise) return dbPromise;
+      dbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open('FlacOfflineDB', 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('audio')) {
+            db.createObjectStore('audio', { keyPath: 'path' });
+          }
+          if (!db.objectStoreNames.contains('covers')) {
+            db.createObjectStore('covers', { keyPath: 'path' });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      return dbPromise;
+    }
+
+    async function loadCachedKeys() {
+      try {
+        const db = await openDB();
+        const keys = await new Promise((resolve) => {
+          const tx = db.transaction('audio', 'readonly');
+          const req = tx.objectStore('audio').getAllKeys();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => resolve([]);
+        });
+        cachedPaths = new Set(keys);
+        updateOfflineBanner();
+        renderTracks();
+      } catch (e) {}
+    }
+
+    async function saveBlobToStore(storeName, path, blob) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).put({ path, blob });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function getBlobFromStore(storeName, path) {
+      try {
+        const db = await openDB();
+        return await new Promise((resolve) => {
+          const tx = db.transaction(storeName, 'readonly');
+          const req = tx.objectStore(storeName).get(path);
+          req.onsuccess = () => resolve(req.result ? req.result.blob : null);
+          req.onerror = () => resolve(null);
+        });
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function updateOfflineBanner(downloadingIndex = null) {
+      const total = tracks.length;
+      const savedCount = tracks.filter(t => cachedPaths.has(t.path)).length;
+      if (!isPcOnline) {
+        offlineBanner.classList.add('offline-mode');
+        offlineStatusText.innerText = `📴 PC đang tắt (Offline) • Nghe trực tiếp ${savedCount}/${total} bài đã lưu trên iPhone`;
+      } else {
+        offlineBanner.classList.remove('offline-mode');
+        if (total === 0) {
+          offlineStatusText.innerText = '🟢 Đã kết nối PC • Thêm nhạc vào PC để tự động lưu về iPhone';
+        } else if (savedCount >= total) {
+          offlineStatusText.innerText = `✔ Đã lưu Offline ${savedCount}/${total} bài vào iPhone (Tắt PC vẫn nghe được)`;
+        } else if (downloadingIndex !== null) {
+          offlineStatusText.innerText = `📥 Đang tự lưu nhạc vào bộ nhớ iPhone: ${savedCount}/${total} bài...`;
+        } else {
+          offlineStatusText.innerText = `🔄 Đã lưu Offline: ${savedCount}/${total} bài`;
+        }
+      }
+    }
+
+    async function syncOfflineQueue() {
+      if (isSyncingOffline || !isPcOnline || !tracks.length) return;
+      isSyncingOffline = true;
+      try {
+        for (let i = 0; i < tracks.length; i++) {
+          if (!isPcOnline) break;
+          const t = tracks[i];
+          if (!cachedPaths.has(t.path)) {
+            updateOfflineBanner(i);
+            // Download audio blob
+            const res = await fetch('/api/stream/' + i);
+            if (res.ok) {
+              const blob = await res.blob();
+              if (blob.size > 0) {
+                await saveBlobToStore('audio', t.path, blob);
+                cachedPaths.add(t.path);
+                renderTracks();
+                updateOfflineBanner(i);
+              }
+            }
+            // Download cover blob if available
+            try {
+              const cRes = await fetch('/api/cover/' + i);
+              if (cRes.ok) {
+                const cBlob = await cRes.blob();
+                if (cBlob.size > 0) {
+                  await saveBlobToStore('covers', t.path, cBlob);
+                }
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (e) {
+      } finally {
+        isSyncingOffline = false;
+        updateOfflineBanner();
+      }
+    }
+
+    function fmtTime(s) {
+      s = Math.max(0, Math.floor(s || 0));
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return m + ":" + (sec < 10 ? "0" : "") + sec;
+    }
+
+    async function loadTracks() {
+      // Load cached tracks immediately first so UI is instant even when PC is off
+      try {
+        const cachedJson = localStorage.getItem('flac_tracks_cache');
+        if (cachedJson && !tracks.length) {
+          tracks = JSON.parse(cachedJson);
+          renderTracks();
+        }
+      } catch (_) {}
+
+      await loadCachedKeys();
+
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch('/api/tracks?t=' + Date.now(), { signal: controller.signal });
+        clearTimeout(timer);
+        if (res.ok) {
+          isPcOnline = true;
+          tracks = await res.json();
+          localStorage.setItem('flac_tracks_cache', JSON.stringify(tracks));
+          renderTracks();
+          updateOfflineBanner();
+          syncOfflineQueue();
+          return;
+        }
+      } catch (e) {
+        isPcOnline = false;
+      }
+      updateOfflineBanner();
+      renderTracks();
+    }
+
+    function renderTracks() {
+      const q = document.getElementById('search').value.toLowerCase().trim();
+      if (!tracks.length) {
+        tracklistEl.innerHTML = '<div class="empty-state">Chưa có bài hát nào.<br>Hãy mở app trên PC lần đầu để tự động tải nhạc về iPhone.</div>';
+        return;
+      }
+      let html = '';
+      tracks.forEach((t, i) => {
+        if (q && !t.title.toLowerCase().includes(q) && !t.artist.toLowerCase().includes(q) && !t.album.toLowerCase().includes(q)) return;
+        const active = i === currentIndex ? ' active' : '';
+        const isHiRes = t.bits >= 24 || t.sample_rate > 48000;
+        const isSaved = cachedPaths.has(t.path);
+        const rateK = t.sample_rate % 1000 === 0 ? (t.sample_rate / 1000) : (t.sample_rate / 1000).toFixed(1);
+        const fmtLabel = t.bits > 0 ? (t.bits + "-bit / " + rateK + "kHz") : (rateK + "kHz");
+        html += `
+          <div class="track-item${active}" onclick="playTrack(${i})">
+            <div class="track-num">${i + 1}</div>
+            <div class="track-info">
+              <div class="track-title">${escapeHtml(t.title)}</div>
+              <div class="track-sub">
+                <span>${escapeHtml(t.artist || '—')}</span>
+                <span class="badge ${isHiRes ? 'hires' : ''}">${isHiRes ? 'HI-RES' : 'FLAC'}</span>
+                <span>${fmtLabel}</span>
+                ${isSaved ? '<span class="badge saved">✔ Đã lưu</span>' : ''}
+              </div>
+            </div>
+            <div class="track-dur">${fmtTime(t.duration)}</div>
+          </div>
+        `;
+      });
+      tracklistEl.innerHTML = html;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[m]);
+    }
+
+    async function playTrack(idx) {
+      if (idx < 0 || idx >= tracks.length) return;
+      currentIndex = idx;
+      const t = tracks[idx];
+
+      // Prefer playing from iPhone offline IndexedDB storage so it works even if PC is turned off!
+      const cachedAudioBlob = await getBlobFromStore('audio', t.path);
+      if (cachedAudioBlob) {
+        if (currentAudioObjectUrl) URL.revokeObjectURL(currentAudioObjectUrl);
+        currentAudioObjectUrl = URL.createObjectURL(cachedAudioBlob);
+        audio.src = currentAudioObjectUrl;
+      } else {
+        audio.src = '/api/stream/' + idx;
+      }
+      audio.play().catch(console.error);
+
+      let coverSrc = '/api/cover/' + idx;
+      const cachedCoverBlob = await getBlobFromStore('covers', t.path);
+      if (cachedCoverBlob) {
+        if (currentCoverObjectUrl) URL.revokeObjectURL(currentCoverObjectUrl);
+        currentCoverObjectUrl = URL.createObjectURL(cachedCoverBlob);
+        coverSrc = currentCoverObjectUrl;
+      }
+
+      // Setup MediaSession for Lock Screen & Control Center
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: t.title,
+          artist: t.artist || 'Hi-Res Audio',
+          album: t.album || '',
+          artwork: [{ src: coverSrc, sizes: '512x512', type: 'image/jpeg' }]
+        });
+      }
+
+      updateUI(coverSrc);
+      renderTracks();
+    }
+
+    function togglePlay() {
+      if (!tracks.length) return;
+      if (currentIndex === -1) {
+        playTrack(0);
+        return;
+      }
+      if (audio.paused) {
+        audio.play().catch(console.error);
+      } else {
+        audio.pause();
+      }
+    }
+
+    function nextTrack() {
+      if (!tracks.length) return;
+      if (repeatMode === 2) {
+        audio.currentTime = 0;
+        audio.play();
+        return;
+      }
+      let n;
+      if (isShuffle) {
+        n = Math.floor(Math.random() * tracks.length);
+      } else {
+        n = (currentIndex + 1) % tracks.length;
+      }
+      playTrack(n);
+    }
+
+    function prevTrack() {
+      if (audio.currentTime > 3) {
+        audio.currentTime = 0;
+        return;
+      }
+      if (!tracks.length) return;
+      let p = (currentIndex + tracks.length - 1) % tracks.length;
+      playTrack(p);
+    }
+
+    function toggleShuffle() {
+      isShuffle = !isShuffle;
+      document.getElementById('btn-shuffle').classList.toggle('active-toggle', isShuffle);
+    }
+
+    function toggleRepeat() {
+      repeatMode = (repeatMode + 1) % 3;
+      const btn = document.getElementById('btn-repeat');
+      if (repeatMode === 0) { btn.innerText = '🔁'; btn.classList.remove('active-toggle'); }
+      else if (repeatMode === 1) { btn.innerText = '🔁'; btn.classList.add('active-toggle'); }
+      else { btn.innerText = '🔂'; btn.classList.add('active-toggle'); }
+    }
+
+    function updateUI(coverUrlOverride) {
+      if (currentIndex === -1) return;
+      const t = tracks[currentIndex];
+      miniPlayer.style.display = 'flex';
+      const rateK = t.sample_rate % 1000 === 0 ? (t.sample_rate / 1000) : (t.sample_rate / 1000).toFixed(1);
+      const fmtLabel = t.bits > 0 ? (t.bits + "-bit / " + rateK + "kHz") : (rateK + "kHz");
+      document.getElementById('mini-title').innerText = t.title;
+      document.getElementById('mini-sub').innerText = (t.artist ? t.artist + ' • ' : '') + fmtLabel;
+      document.getElementById('full-title').innerText = t.title;
+      document.getElementById('full-artist').innerText = t.artist || '—';
+
+      const coverUrl = coverUrlOverride || ('/api/cover/' + currentIndex);
+      document.getElementById('mini-cover').innerHTML = `<img src="${coverUrl}" onerror="this.remove()">`;
+      document.getElementById('full-cover').innerHTML = `<img src="${coverUrl}" onerror="this.remove()">`;
+
+      const isHiRes = t.bits >= 24 || t.sample_rate > 48000;
+      document.getElementById('full-badges').innerHTML = `
+        <span class="badge ${isHiRes ? 'hires' : ''}">${isHiRes ? 'HI-RES AUDIO' : 'LOSSLESS'}</span>
+        <span class="badge">${t.bits > 0 ? t.bits + '-BIT' : ''} ${t.sample_rate} HZ</span>
+      `;
+    }
+
+    audio.onplay = () => {
+      document.getElementById('mini-play-icon').innerText = '⏸';
+      document.getElementById('full-play-icon').innerText = '⏸';
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+    };
+    audio.onpause = () => {
+      document.getElementById('mini-play-icon').innerText = '▶';
+      document.getElementById('full-play-icon').innerText = '▶';
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+    };
+    audio.ontimeupdate = () => {
+      if (isScrubbing) return;
+      const dur = audio.duration || tracks[currentIndex]?.duration || 1;
+      const cur = audio.currentTime || 0;
+      document.getElementById('scrubber').value = (cur / dur) * 100;
+      document.getElementById('curr-time').innerText = fmtTime(cur);
+      document.getElementById('total-time').innerText = fmtTime(dur);
+    };
+    audio.onended = () => nextTrack();
+
+    function onScrub(val) {
+      isScrubbing = true;
+      const dur = audio.duration || tracks[currentIndex]?.duration || 1;
+      audio.currentTime = (val / 100) * dur;
+      setTimeout(() => isScrubbing = false, 150);
+    }
+
+    function openNowPlaying() { nowPlaying.classList.add('open'); }
+    function closeNowPlaying() { nowPlaying.classList.remove('open'); }
+
+    // MediaSession handlers for iPhone Lock Screen controls
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', () => audio.play());
+      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+      navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
+      navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime) audio.currentTime = details.seekTime;
+      });
+    }
+
+    // ---------------- Web Audio API Parametric EQ (Peace / AutoEQ) ----------------
+    const AUTOEQ_PRESETS = {
+      flat: "Preamp: 0.0 dB\nFilter 1: ON PK Fc 1000 Hz Gain 0.0 dB Q 1.41",
+      xm4: "Preamp: -6.3 dB\nFilter 1: ON LSC Fc 105 Hz Gain 3.1 dB Q 0.70\nFilter 2: ON PK Fc 205 Hz Gain -5.2 dB Q 1.15\nFilter 3: ON PK Fc 890 Hz Gain 2.4 dB Q 1.40\nFilter 4: ON PK Fc 2450 Hz Gain 4.8 dB Q 1.80\nFilter 5: ON PK Fc 4300 Hz Gain 3.9 dB Q 2.10\nFilter 6: ON HSC Fc 10000 Hz Gain 4.5 dB Q 0.70",
+      hd600: "Preamp: -5.8 dB\nFilter 1: ON LSC Fc 105 Hz Gain 5.6 dB Q 0.70\nFilter 2: ON PK Fc 210 Hz Gain -1.8 dB Q 1.20\nFilter 3: ON PK Fc 3300 Hz Gain -2.1 dB Q 2.20\nFilter 4: ON HSC Fc 10000 Hz Gain 2.0 dB Q 0.70",
+      app2: "Preamp: -4.2 dB\nFilter 1: ON LSC Fc 105 Hz Gain 2.2 dB Q 0.70\nFilter 2: ON PK Fc 350 Hz Gain -1.6 dB Q 1.30\nFilter 3: ON PK Fc 1850 Hz Gain 3.1 dB Q 1.90\nFilter 4: ON PK Fc 5500 Hz Gain -2.4 dB Q 2.50\nFilter 5: ON HSC Fc 10500 Hz Gain 3.2 dB Q 0.70",
+      aria: "Preamp: -4.8 dB\nFilter 1: ON LSC Fc 105 Hz Gain 3.8 dB Q 0.70\nFilter 2: ON PK Fc 280 Hz Gain -1.4 dB Q 1.20\nFilter 3: ON PK Fc 3100 Hz Gain -2.2 dB Q 2.00\nFilter 4: ON PK Fc 6200 Hz Gain 2.5 dB Q 2.80\nFilter 5: ON HSC Fc 11000 Hz Gain 3.6 dB Q 0.70",
+      bass: "Preamp: -6.5 dB\nFilter 1: ON LSC Fc 105 Hz Gain 6.5 dB Q 0.71\nFilter 2: ON PK Fc 220 Hz Gain -1.5 dB Q 1.40\nFilter 3: ON PK Fc 3200 Hz Gain 2.0 dB Q 1.60\nFilter 4: ON HSC Fc 10000 Hz Gain 2.5 dB Q 0.70",
+      vocal: "Preamp: -4.0 dB\nFilter 1: ON LSC Fc 90 Hz Gain 1.8 dB Q 0.70\nFilter 2: ON PK Fc 250 Hz Gain -1.5 dB Q 1.41\nFilter 3: ON PK Fc 1500 Hz Gain 2.2 dB Q 1.30\nFilter 4: ON PK Fc 3500 Hz Gain 2.8 dB Q 1.80\nFilter 5: ON HSC Fc 11000 Hz Gain 3.5 dB Q 0.70"
+    };
+
+    let audioCtx = null;
+    let sourceNode = null;
+    let preampNode = null;
+    let biquadNodes = [];
+    let eqEnabled = false;
+
+    function ensureAudioGraph() {
+      if (audioCtx) return;
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      audioCtx = new Ctx();
+      sourceNode = audioCtx.createMediaElementSource(audio);
+      preampNode = audioCtx.createGain();
+      sourceNode.connect(preampNode);
+      preampNode.connect(audioCtx.destination);
+    }
+
+    function openEqModal() { document.getElementById('eq-modal').style.display = 'flex'; }
+    function closeEqModal() { document.getElementById('eq-modal').style.display = 'none'; }
+
+    function toggleEqEnabled() {
+      eqEnabled = !eqEnabled;
+      rebuildWebEq(document.getElementById('eq-text').value);
+    }
+
+    function selectEqPreset(key) {
+      if (AUTOEQ_PRESETS[key]) {
+        document.getElementById('eq-text').value = AUTOEQ_PRESETS[key];
+        eqEnabled = (key !== 'flat');
+        rebuildWebEq(AUTOEQ_PRESETS[key]);
+      }
+    }
+
+    function onPreampChange(val) {
+      document.getElementById('eq-preamp-val').innerText = parseFloat(val).toFixed(1);
+      if (preampNode && eqEnabled) {
+        preampNode.gain.value = Math.pow(10, parseFloat(val) / 20);
+      }
+    }
+
+    function applyEqFromText() {
+      eqEnabled = true;
+      rebuildWebEq(document.getElementById('eq-text').value);
+      closeEqModal();
+    }
+
+    function rebuildWebEq(text) {
+      ensureAudioGraph();
+      if (!audioCtx || !sourceNode) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      sourceNode.disconnect();
+      preampNode.disconnect();
+      biquadNodes.forEach(n => n.disconnect());
+      biquadNodes = [];
+
+      const btn = document.getElementById('eq-toggle-btn');
+      const topBtn = document.getElementById('eq-btn');
+      if (!eqEnabled) {
+        btn.innerText = '⚪ Đang Tắt (Bypass)';
+        btn.style.background = '#232733';
+        topBtn.innerText = '🎚 AutoEQ';
+        sourceNode.connect(audioCtx.destination);
+        return;
+      }
+
+      btn.innerText = '🟢 Đang Bật EQ';
+      btn.style.background = '#3dd68c';
+      btn.style.color = '#000';
+      topBtn.innerText = '🎚 EQ: ON';
+
+      let preampDb = 0;
+      const lines = text.split('\n');
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (/^preamp:/i.test(line)) {
+          const m = line.match(/([-+]?\d+(\.\d+)?)/);
+          if (m) preampDb = parseFloat(m[1]);
+        } else if (/^filter/i.test(line) && /\bON\b/i.test(line)) {
+          const typeMatch = line.match(/\b(PK|PEA|PEQ|LSC|LS|HSC|HS|LP|LPQ|HP|HPQ|NO|BP)\b/i);
+          const fcMatch = line.match(/Fc\s+([\d.]+)/i);
+          const gainMatch = line.match(/Gain\s+([-+]?[\d.]+)/i);
+          const qMatch = line.match(/Q\s+([\d.]+)/i);
+          if (typeMatch && fcMatch) {
+            const node = audioCtx.createBiquadFilter();
+            const code = typeMatch[1].toUpperCase();
+            if (code.startsWith('LS')) node.type = 'lowshelf';
+            else if (code.startsWith('HS')) node.type = 'highshelf';
+            else if (code.startsWith('LP')) node.type = 'lowpass';
+            else if (code.startsWith('HP')) node.type = 'highpass';
+            else if (code === 'NO') node.type = 'notch';
+            else if (code === 'BP') node.type = 'bandpass';
+            else node.type = 'peaking';
+
+            node.frequency.value = parseFloat(fcMatch[1]);
+            node.gain.value = gainMatch ? parseFloat(gainMatch[1]) : 0;
+            node.Q.value = qMatch ? parseFloat(qMatch[1]) : 0.707;
+            biquadNodes.push(node);
+          }
+        }
+      }
+
+      document.getElementById('eq-preamp').value = preampDb;
+      document.getElementById('eq-preamp-val').innerText = preampDb.toFixed(1);
+      preampNode.gain.value = Math.pow(10, preampDb / 20);
+
+      sourceNode.connect(preampNode);
+      let prev = preampNode;
+      for (const n of biquadNodes) {
+        prev.connect(n);
+        prev = n;
+      }
+      prev.connect(audioCtx.destination);
+    }
+
+    loadTracks();
+    setInterval(async () => {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch('/api/tracks?t=' + Date.now(), { signal: controller.signal });
+        clearTimeout(timer);
+        if (res.ok) {
+          const wasOffline = !isPcOnline;
+          isPcOnline = true;
+          const newTracks = await res.json();
+          const changed = newTracks.length !== tracks.length || JSON.stringify(newTracks.map(t => t.path)) !== JSON.stringify(tracks.map(t => t.path));
+          if (changed || wasOffline) {
+            tracks = newTracks;
+            localStorage.setItem('flac_tracks_cache', JSON.stringify(tracks));
+            renderTracks();
+            updateOfflineBanner();
+            syncOfflineQueue();
+          } else if (!isSyncingOffline && tracks.some(t => !cachedPaths.has(t.path))) {
+            syncOfflineQueue();
+          }
+        } else {
+          isPcOnline = false;
+          updateOfflineBanner();
+        }
+      } catch (e) {
+        if (isPcOnline) {
+          isPcOnline = false;
+          updateOfflineBanner();
+        }
+      }
+    }, 3000);
+  </script>
+</body>
+</html>

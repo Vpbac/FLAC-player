@@ -1,14 +1,68 @@
-name: Build iOS IPA
+name: Build & Release All Platforms (PC, iOS, Android XZ1)
 
 on:
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - '**.md'
   workflow_dispatch:
 
-jobs:
-  build:
-    runs-on: macos-15
+permissions:
+  contents: write
 
+jobs:
+  build-android:
+    name: Build Android APK (Sony XZ1 LineageOS 15)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.6'
+
+      - name: Build Signed Release APK
+        working-directory: android
+        run: |
+          gradle assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk ../FlacPlayer-Android-XZ1.apk
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlacPlayer-Android-XZ1-APK
+          path: FlacPlayer-Android-XZ1.apk
+
+  build-pc:
+    name: Build Windows PC EXE (WASAPI + AutoEQ)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Rust Release Binary
+        working-directory: pc
+        run: |
+          cargo build --release
+          Copy-Item "target/release/flac_player.exe" "../FlacPlayer-Windows-x64.exe"
+
+      - name: Upload Windows EXE Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlacPlayer-Windows-PC
+          path: FlacPlayer-Windows-x64.exe
+
+  build-ios:
+    name: Build iOS IPA (SwiftUI + AutoEQ)
+    runs-on: macos-15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,14 +94,42 @@ jobs:
             echo "Error: .app bundle not found!"
             exit 1
           fi
-          echo "Found app at: $APP_PATH"
           mkdir -p Payload
           cp -r "$APP_PATH" Payload/
           zip -qr FlacPlayeriOS.ipa Payload
           rm -rf Payload
 
-      - name: Upload IPA Artifact
+      - name: Upload iOS IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: FlacPlayeriOS-IPA
           path: FlacPlayeriOS.ipa
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-android, build-pc, build-ios]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_assets
+          merge-multiple: true
+
+      - name: Create & Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.0.${{ github.run_number }}
+          name: "Hi-Res FLAC Player v2.0.${{ github.run_number }} (PC + iOS + Sony XZ1 Android)"
+          body: |
+            ### 🎧 Hi-Res FLAC Player & Parametric AutoEQ Release
+            - **Windows PC (`FlacPlayer-Windows-x64.exe`)**: Native WASAPI Shared/Exclusive + 64-bit Parametric EQ (Peace EQ / AutoEQ `ParametricEQ.txt`) + Auto Folder Watcher + Local Streaming Server.
+            - **Android (`FlacPlayer-Android-XZ1.apk`)**: Tối ưu cho **Sony Xperia XZ1 (LineageOS 15 / Android 8.0+)** — 64-bit RBJ Biquad Parametric EQ + AutoEQ Presets + Quét thẻ nhớ SD/Internal + Tự động tải Offline từ PC.
+            - **iOS (`FlacPlayeriOS.ipa`)**: Native SwiftUI + Parametric EQ (AutoEQ) + Tự động lưu Offline khi tắt PC.
+          files: |
+            release_assets/FlacPlayer-Android-XZ1.apk
+            release_assets/FlacPlayer-Windows-x64.exe
+            release_assets/FlacPlayeriOS.ipa
+          draft: false
+          prerelease: false
+          make_latest: "true"

@@ -12,6 +12,7 @@ public struct TrackListView: View {
     @State private var searchText: String = ""
     @State private var showSettings: Bool = false
     @State private var showNowPlaying: Bool = false
+    @State private var showEQ: Bool = false
 
     var filteredTracks: [ItemTrack] {
         let all = server.tracks.enumerated().map { ItemTrack(index: $0.offset, track: $0.element) }
@@ -94,10 +95,22 @@ public struct TrackListView: View {
             }
             .navigationTitle("Hi-Res Library")
             .navigationBarItems(
-                leading: Button(action: {
-                    server.fetchTracks()
-                }) {
-                    Image(systemName: "arrow.clockwise")
+                leading: HStack(spacing: 14) {
+                    Button(action: {
+                        server.fetchTracks()
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    Button(action: {
+                        showEQ = true
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "slider.horizontal.3")
+                            Text("EQ")
+                                .font(.system(size: 13, weight: .bold))
+                        }
+                        .foregroundColor(.yellow)
+                    }
                 },
                 trailing: Button(action: {
                     showSettings = true
@@ -115,6 +128,9 @@ public struct TrackListView: View {
             }
             .sheet(isPresented: $showNowPlaying) {
                 NowPlayingView()
+            }
+            .sheet(isPresented: $showEQ) {
+                ParametricEQView()
             }
         }
     }
