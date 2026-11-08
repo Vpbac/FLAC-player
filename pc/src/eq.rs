@@ -1,4 +1,4 @@
-//! Parametric Equalizer (Peace EQ / EqualizerAPO / AutoEQ compatible)
+//! Parametric Equalizer (AutoEQ ParametricEQ.txt compatible)
 //! 64-bit floating-point RBJ Audio EQ Cookbook biquad filter cascade.
 
 use std::f64::consts::PI;
@@ -124,7 +124,7 @@ impl Default for EqConfig {
 }
 
 impl EqConfig {
-    /// Parse EqualizerAPO / Peace / AutoEQ ParametricEQ.txt format
+    /// Parse AutoEQ ParametricEQ.txt format
     pub fn from_autoeq_text(name: &str, text: &str) -> Self {
         let mut preamp_db = 0.0;
         let mut bands = Vec::new();

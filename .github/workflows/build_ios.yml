@@ -123,8 +123,8 @@ jobs:
           name: "Hi-Res FLAC Player v2.0.${{ github.run_number }} (PC + iOS + Sony XZ1 Android)"
           body: |
             ### 🎧 Hi-Res FLAC Player & Parametric AutoEQ Release
-            - **Windows PC (`FlacPlayer-Windows-x64.exe`)**: Native WASAPI Shared/Exclusive + 64-bit Parametric EQ (Peace EQ / AutoEQ `ParametricEQ.txt`) + Auto Folder Watcher + Local Streaming Server.
-            - **Android (`FlacPlayer-Android-XZ1.apk`)**: Tối ưu cho **Sony Xperia XZ1 (LineageOS 15 / Android 8.0+)** — 64-bit RBJ Biquad Parametric EQ + AutoEQ Presets + Quét thẻ nhớ SD/Internal + Tự động tải Offline từ PC.
+            - **Windows PC (`FlacPlayer-Windows-x64.exe`)**: Native WASAPI Shared/Exclusive + 64-bit Parametric EQ (AutoEQ `ParametricEQ.txt`) + Auto Folder Watcher + Local Streaming Server.
+            - **Android (`FlacPlayer-Android-XZ1.apk`)**: Tối ưu cho **Sony Xperia XZ1 (LineageOS 23 / Android 15 — API 35)** — 64-bit RBJ Biquad Parametric EQ + AutoEQ Presets + Quét thẻ nhớ microSD/Internal + Tự động tải Offline từ PC.
             - **iOS (`FlacPlayeriOS.ipa`)**: Native SwiftUI + Parametric EQ (AutoEQ) + Tự động lưu Offline khi tắt PC.
           files: |
             release_assets/FlacPlayer-Android-XZ1.apk

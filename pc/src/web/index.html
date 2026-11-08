@@ -370,7 +370,7 @@
   <!-- Parametric EQ Modal -->
   <div id="eq-modal" style="display:none; position:fixed; inset:0; background:rgba(10,12,16,0.96); z-index:300; flex-direction:column; padding:calc(env(safe-area-inset-top) + 16px) 18px 24px; overflow-y:auto;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <div style="font-size:18px; font-weight:700; color:#4cc2ff;">🎚 Parametric EQ (Peace / AutoEQ)</div>
+      <div style="font-size:18px; font-weight:700; color:#4cc2ff;">🎚 Parametric EQ • 64-bit DSP</div>
       <button class="refresh-btn" onclick="closeEqModal()">Đóng ✕</button>
     </div>
     <div style="display:flex; gap:8px; margin-bottom:12px; align-items:center;">
@@ -389,7 +389,7 @@
       Preamp: <span id="eq-preamp-val">0.0</span> dB
       <input type="range" id="eq-preamp" min="-15" max="6" step="0.5" value="0" style="width:100%; margin-top:4px;" oninput="onPreampChange(this.value)">
     </div>
-    <div style="font-size:12px; color:#9aa0a6; margin-bottom:4px;">Dán cấu hình ParametricEQ.txt (chuẩn Peace EQ / AutoEQ):</div>
+    <div style="font-size:12px; color:#9aa0a6; margin-bottom:4px;">Cấu hình AutoEQ (ParametricEQ.txt):</div>
     <textarea id="eq-text" rows="7" style="width:100%; background:#14161d; color:#3dd68c; border:1px solid #2d3345; border-radius:8px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:10px;">Preamp: -6.0 dB
 Filter 1: ON LSC Fc 105 Hz Gain 6.0 dB Q 0.70
 Filter 2: ON PK Fc 220 Hz Gain -1.5 dB Q 1.40
@@ -815,7 +815,7 @@ Filter 4: ON HSC Fc 10000 Hz Gain 2.5 dB Q 0.70</textarea>
       });
     }
 
-    // ---------------- Web Audio API Parametric EQ (Peace / AutoEQ) ----------------
+    // ---------------- Web Audio API Parametric EQ (AutoEQ) ----------------
     const AUTOEQ_PRESETS = {
       flat: "Preamp: 0.0 dB\nFilter 1: ON PK Fc 1000 Hz Gain 0.0 dB Q 1.41",
       xm4: "Preamp: -6.3 dB\nFilter 1: ON LSC Fc 105 Hz Gain 3.1 dB Q 0.70\nFilter 2: ON PK Fc 205 Hz Gain -5.2 dB Q 1.15\nFilter 3: ON PK Fc 890 Hz Gain 2.4 dB Q 1.40\nFilter 4: ON PK Fc 2450 Hz Gain 4.8 dB Q 1.80\nFilter 5: ON PK Fc 4300 Hz Gain 3.9 dB Q 2.10\nFilter 6: ON HSC Fc 10000 Hz Gain 4.5 dB Q 0.70",

@@ -528,14 +528,14 @@ impl App {
 
     fn top_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            ui.label(RichText::new("◉ Hi-Res Player").size(18.0).strong().color(ACCENT));
-            ui.add_space(12.0);
-            if ui.button("📁  Thêm thư mục").clicked() {
+            ui.label(RichText::new("◉ Hi-Res Audio").size(18.0).strong().color(ACCENT));
+            ui.add_space(8.0);
+            if ui.button("📁 Thêm thư mục").on_hover_text("Thêm thư mục nhạc (Tự động theo dõi nhạc mới)").clicked() {
                 if let Some(dirs) = rfd::FileDialog::new().set_title("Chọn thư mục nhạc").pick_folders() {
                     self.add_paths(dirs, &ui.ctx().clone());
                 }
             }
-            if ui.button("🎵  Thêm file").clicked() {
+            if ui.button("🎵 Thêm file").on_hover_text("Thêm file nhạc lẻ").clicked() {
                 if let Some(files) = rfd::FileDialog::new()
                     .add_filter("Audio", library::AUDIO_EXTS)
                     .set_title("Chọn file nhạc")
@@ -544,35 +544,50 @@ impl App {
                     self.add_paths(files, &ui.ctx().clone());
                 }
             }
-            if ui.button("🗑  Xóa danh sách").clicked() {
+            if ui.button("🗑 Xóa").on_hover_text("Xóa toàn bộ danh sách phát").clicked() {
                 self.clear_playlist();
             }
-            ui.add_space(8.0);
+            ui.add_space(6.0);
             ui.add(
                 egui::TextEdit::singleline(&mut self.search)
                     .hint_text("🔍 Tìm bài hát, nghệ sĩ, album...")
-                    .desired_width(260.0),
+                    .desired_width(220.0),
             );
-            if let Some(srv) = &self.server_handle {
-                let ip = srv.lan_ips.first().cloned().unwrap_or_else(|| "127.0.0.1".into());
-                let btn_text = format!("📱 iPhone Link: {}:{}", ip, srv.port);
-                if ui.button(RichText::new(btn_text).color(GREEN).strong()).on_hover_text("Bấm để xem hướng dẫn kết nối từ iPhone").clicked() {
-                    self.show_server_modal = true;
-                }
-            }
 
-            let eq_col = if self.eq_config.enabled { GOLD } else { DIM };
-            let eq_label = if self.eq_config.enabled {
-                format!("🎚 EQ: ON ({})", self.eq_config.name)
+            let (eq_label, eq_col, eq_fill) = if self.eq_config.enabled {
+                (
+                    format!("🎚 EQ: {}", self.eq_config.name),
+                    Color32::BLACK,
+                    GOLD,
+                )
             } else {
-                "🎚 Parametric EQ (Peace / AutoEQ)".to_string()
+                (
+                    "🎚 Parametric EQ".to_string(),
+                    Color32::from_gray(230),
+                    Color32::from_rgb(0x23, 0x27, 0x33),
+                )
             };
             if ui
-                .button(RichText::new(eq_label).color(eq_col).strong())
-                .on_hover_text("Mở bộ cân bằng âm thanh Parametric EQ (Hỗ trợ chuẩn Peace EQ / AutoEQ ParametricEQ.txt)")
+                .add(egui::Button::new(RichText::new(eq_label).color(eq_col).strong()).fill(eq_fill))
+                .on_hover_text("Bộ cân bằng âm thanh Parametric EQ 64-bit DSP & AutoEQ")
                 .clicked()
             {
                 self.show_eq_modal = !self.show_eq_modal;
+            }
+
+            if let Some(srv) = &self.server_handle {
+                let ip = srv.lan_ips.first().cloned().unwrap_or_else(|| "127.0.0.1".into());
+                let btn_text = format!("📡 {}:{}", ip, srv.port);
+                if ui
+                    .add(
+                        egui::Button::new(RichText::new(btn_text).color(GREEN).strong())
+                            .fill(Color32::from_rgb(0x18, 0x26, 0x22)),
+                    )
+                    .on_hover_text("Kết nối & đồng bộ nhạc sang điện thoại qua Wi-Fi")
+                    .clicked()
+                {
+                    self.show_server_modal = true;
+                }
             }
 
             if self.scanning > 0 {
@@ -581,21 +596,23 @@ impl App {
             }
 
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                let (btn_title, btn_color, tip) = if self.exclusive {
+                let (btn_title, btn_color, btn_bg, tip) = if self.exclusive {
                     (
-                        "🔒 Exclusive Mode (Đang chiếm DAC)",
+                        "🔒 Exclusive",
                         GOLD,
-                        "Đang chiếm quyền độc quyền thiết bị DAC (Bit-Perfect).\n⚠️ Chú ý: Các ứng dụng khác (YouTube, Spotify, Game) sẽ không phát được âm thanh trong lúc app này phát.\nBấm vào để đổi sang Shared Mode (nghe chung không lỗi).",
+                        Color32::from_rgb(0x2a, 0x23, 0x16),
+                        "Chế độ Bit-Perfect độc quyền DAC.\nCác ứng dụng khác sẽ tạm ngừng phát âm thanh khi nhạc đang chạy.\nBấm để chuyển về Shared Mode.",
                     )
                 } else {
                     (
-                        "🎧 Shared Mode (Nghe chung đa nhiệm)",
+                        "🎧 Shared",
                         GREEN,
-                        "Chế độ nghe chung (Mặc định): Bạn có thể nghe nhạc FLAC chất lượng cao cùng lúc với YouTube, Spotify, Game, Discord mà không bao giờ bị lỗi âm thanh.\nBấm vào nếu bạn muốn bật Exclusive Mode.",
+                        Color32::from_rgb(0x18, 0x26, 0x22),
+                        "Chế độ nghe chung đa nhiệm (Mặc định).\nNghe nhạc cùng lúc với YouTube, Game, Discord.\nBấm để chuyển sang Exclusive Mode (Bit-Perfect).",
                     )
                 };
                 if ui
-                    .button(RichText::new(btn_title).color(btn_color).strong())
+                    .add(egui::Button::new(RichText::new(btn_title).color(btn_color).strong()).fill(btn_bg))
                     .on_hover_text(tip)
                     .clicked()
                 {
@@ -612,7 +629,7 @@ impl App {
                 let mut chosen = self.device_id.clone();
                 let resp = egui::ComboBox::from_id_salt("device")
                     .selected_text(current_name)
-                    .width(240.0)
+                    .width(200.0)
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut chosen, None, "Thiết bị mặc định");
                         for d in &self.devices {
@@ -626,7 +643,7 @@ impl App {
                     self.device_id = chosen;
                     self.apply_output();
                 }
-                ui.label(RichText::new("🔊 Output:").color(DIM));
+                ui.label(RichText::new("🔊").color(DIM));
             });
         });
     }
@@ -1074,131 +1091,224 @@ impl App {
         let mut open = true;
         let mut changed = false;
 
-        egui::Window::new("🎚 Parametric EQ — Chuẩn Peace EQ / AutoEQ (64-bit DSP)")
+        egui::Window::new("🎚 Parametric EQ • 64-bit DSP")
             .open(&mut open)
             .resizable(true)
-            .default_width(780.0)
-            .default_height(560.0)
+            .default_width(820.0)
+            .default_height(600.0)
             .show(ctx, |ui| {
-                // Top row: Enable toggle, Preset selector, Import/Export file
-                ui.horizontal(|ui| {
-                    let en_text = if self.eq_config.enabled { "🟢 ĐANG BẬT EQ" } else { "⚪ ĐANG TẮT (BYPASS)" };
-                    let en_col = if self.eq_config.enabled { GREEN } else { DIM };
-                    if ui.button(RichText::new(en_text).color(en_col).strong()).clicked() {
-                        self.eq_config.enabled = !self.eq_config.enabled;
-                        changed = true;
-                    }
-
-                    ui.separator();
-                    ui.label(RichText::new("Preset AutoEQ:").strong());
-                    let presets = EqConfig::builtin_presets();
-                    egui::ComboBox::from_id_salt("autoeq_preset")
-                        .selected_text(&self.eq_config.name)
-                        .width(240.0)
-                        .show_ui(ui, |ui| {
-                            for p in presets {
-                                if ui.selectable_label(self.eq_config.name == p.name, &p.name).clicked() {
-                                    let was_enabled = self.eq_config.enabled;
-                                    self.eq_config = p;
-                                    self.eq_config.enabled = was_enabled || self.eq_config.name != "Flat (Mặc định)";
-                                    changed = true;
-                                }
-                            }
-                        });
-
-                    if ui.button("📂 Nạp file ParametricEQ.txt").on_hover_text("Mở file ParametricEQ.txt tải từ AutoEQ.app hoặc Peace EQ").clicked() {
-                        if let Some(path) = rfd::FileDialog::new()
-                            .add_filter("AutoEQ / Peace TXT", &["txt", "peq"])
-                            .set_title("Chọn file ParametricEQ.txt (AutoEQ / Peace)")
-                            .pick_file()
-                        {
-                            if let Ok(content) = std::fs::read_to_string(&path) {
-                                let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("Custom AutoEQ");
-                                self.eq_config = EqConfig::from_autoeq_text(name, &content);
-                                self.eq_config.enabled = true;
+                // Header toolbar card
+                egui::Frame::new()
+                    .fill(Color32::from_rgb(0x18, 0x1b, 0x24))
+                    .corner_radius(CornerRadius::same(8))
+                    .inner_margin(Margin::symmetric(12, 8))
+                    .stroke(Stroke::new(1.0, Color32::from_rgb(0x28, 0x2e, 0x3d)))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            let (en_text, en_fg, en_bg) = if self.eq_config.enabled {
+                                ("🟢 ĐANG BẬT", Color32::BLACK, GREEN)
+                            } else {
+                                ("⚪ TẮT (BYPASS)", Color32::from_gray(210), Color32::from_rgb(0x26, 0x2a, 0x36))
+                            };
+                            if ui
+                                .add(egui::Button::new(RichText::new(en_text).color(en_fg).strong()).fill(en_bg))
+                                .clicked()
+                            {
+                                self.eq_config.enabled = !self.eq_config.enabled;
                                 changed = true;
                             }
-                        }
-                    }
 
-                    if ui.button("➕ Thêm Band").clicked() {
-                        self.eq_config.bands.push(EqBand::default());
-                        changed = true;
-                    }
+                            ui.separator();
+                            ui.label(RichText::new("Preset:").color(DIM));
+                            let presets = EqConfig::builtin_presets();
+                            egui::ComboBox::from_id_salt("autoeq_preset")
+                                .selected_text(&self.eq_config.name)
+                                .width(240.0)
+                                .show_ui(ui, |ui| {
+                                    for p in presets {
+                                        if ui.selectable_label(self.eq_config.name == p.name, &p.name).clicked() {
+                                            let was_enabled = self.eq_config.enabled;
+                                            self.eq_config = p;
+                                            self.eq_config.enabled = was_enabled || self.eq_config.name != "Flat (Mặc định)";
+                                            changed = true;
+                                        }
+                                    }
+                                });
 
-                    if ui.button("🔄 Reset Flat").clicked() {
-                        self.eq_config = EqConfig::default();
-                        changed = true;
-                    }
-                });
+                            if ui
+                                .button("📂 Mở file .txt")
+                                .on_hover_text("Nạp file cấu hình ParametricEQ.txt chuẩn AutoEQ")
+                                .clicked()
+                            {
+                                if let Some(path) = rfd::FileDialog::new()
+                                    .add_filter("AutoEQ Preset (.txt)", &["txt", "peq"])
+                                    .set_title("Chọn file cấu hình ParametricEQ.txt")
+                                    .pick_file()
+                                {
+                                    if let Ok(content) = std::fs::read_to_string(&path) {
+                                        let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("Custom AutoEQ");
+                                        self.eq_config = EqConfig::from_autoeq_text(name, &content);
+                                        self.eq_config.enabled = true;
+                                        changed = true;
+                                    }
+                                }
+                            }
+
+                            if ui.button("➕ Thêm dải tần").clicked() {
+                                self.eq_config.bands.push(EqBand::default());
+                                changed = true;
+                            }
+
+                            if ui.button("🔄 Mặc định").clicked() {
+                                self.eq_config = EqConfig::default();
+                                changed = true;
+                            }
+                        });
+                    });
 
                 ui.add_space(6.0);
 
-                // Preamp row
-                ui.horizontal(|ui| {
-                    ui.label(RichText::new("Preamp (Tiền khuếch đại):").strong());
-                    ui.spacing_mut().slider_width = 240.0;
-                    if ui
-                        .add(egui::Slider::new(&mut self.eq_config.preamp_db, -24.0..=12.0).suffix(" dB").step_by(0.1))
-                        .changed()
-                    {
-                        changed = true;
-                    }
-                    if ui
-                        .button("🛡 Tự động chống rè (Auto Preamp)")
-                        .on_hover_text("Tự động hạ Preamp tương ứng với mức tăng cao nhất trên đồ thị để chống vỡ tiếng (Clipping)")
-                        .clicked()
-                    {
-                        let mut max_gain = 0.0_f64;
-                        let mut cfg_no_pre = self.eq_config.clone();
-                        cfg_no_pre.preamp_db = 0.0;
-                        for step in 0..120 {
-                            let f = 20.0 * (1000.0_f64).powf(step as f64 / 119.0);
-                            max_gain = max_gain.max(cfg_no_pre.response_db(f, 48000.0));
-                        }
-                        self.eq_config.preamp_db = (-max_gain - 0.2).min(0.0).clamp(-24.0, 12.0);
-                        changed = true;
-                    }
-                });
+                // Preamp & Anti-Clipping row
+                egui::Frame::new()
+                    .fill(Color32::from_rgb(0x15, 0x18, 0x20))
+                    .corner_radius(CornerRadius::same(8))
+                    .inner_margin(Margin::symmetric(12, 6))
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label(RichText::new("Preamp:").strong());
+                            ui.spacing_mut().slider_width = 240.0;
+                            if ui
+                                .add(
+                                    egui::Slider::new(&mut self.eq_config.preamp_db, -24.0..=12.0)
+                                        .suffix(" dB")
+                                        .step_by(0.1),
+                                )
+                                .changed()
+                            {
+                                changed = true;
+                            }
+                            if ui
+                                .button("🛡 Tự động chống rè (Auto-Preamp)")
+                                .on_hover_text("Tự động cân chỉnh Preamp theo đỉnh tần số cao nhất để tránh vỡ tiếng (Clipping)")
+                                .clicked()
+                            {
+                                let mut max_gain = 0.0_f64;
+                                let mut cfg_no_pre = self.eq_config.clone();
+                                cfg_no_pre.preamp_db = 0.0;
+                                for step in 0..120 {
+                                    let f = 20.0 * (1000.0_f64).powf(step as f64 / 119.0);
+                                    max_gain = max_gain.max(cfg_no_pre.response_db(f, 48000.0));
+                                }
+                                self.eq_config.preamp_db = (-max_gain - 0.2).min(0.0).clamp(-24.0, 12.0);
+                                changed = true;
+                            }
+                        });
+                    });
 
                 ui.add_space(6.0);
 
                 // Live Frequency Response Curve Graph (20 Hz - 20 kHz)
-                let graph_h = 135.0;
-                let graph_w = ui.available_width().max(300.0);
+                let graph_h = 165.0;
+                let graph_w = ui.available_width().max(320.0);
                 let (rect, _) = ui.allocate_exact_size(Vec2::new(graph_w, graph_h), Sense::hover());
                 let painter = ui.painter_at(rect);
-                painter.rect_filled(rect, CornerRadius::same(6), Color32::from_rgb(16, 18, 24));
-                painter.rect_stroke(rect, CornerRadius::same(6), Stroke::new(1.0, Color32::from_gray(45)), egui::StrokeKind::Inside);
+                painter.rect_filled(rect, CornerRadius::same(8), Color32::from_rgb(11, 13, 18));
+                painter.rect_stroke(
+                    rect,
+                    CornerRadius::same(8),
+                    Stroke::new(1.0, Color32::from_rgb(0x28, 0x2e, 0x3d)),
+                    egui::StrokeKind::Inside,
+                );
 
-                // 0 dB center line and +/- 6, 12 dB lines
+                let plot_top = rect.top() + 10.0;
+                let plot_bottom = rect.bottom() - 20.0;
+                let plot_mid_y = (plot_top + plot_bottom) * 0.5;
+                let plot_half_h = (plot_bottom - plot_top) * 0.45;
                 let db_range = 18.0_f64;
+
+                // Vertical log-frequency grid lines
+                for &(freq_mark, label) in &[
+                    (31.5_f64, "31"),
+                    (63.0, "63"),
+                    (125.0, "125"),
+                    (250.0, "250"),
+                    (500.0, "500"),
+                    (1000.0, "1k"),
+                    (2000.0, "2k"),
+                    (4000.0, "4k"),
+                    (8000.0, "8k"),
+                    (16000.0, "16k"),
+                ] {
+                    let t = ((freq_mark / 20.0).ln() / 1000.0_f64.ln()) as f32;
+                    let x = rect.left() + t * rect.width();
+                    painter.line_segment(
+                        [egui::pos2(x, plot_top), egui::pos2(x, plot_bottom)],
+                        Stroke::new(1.0, Color32::from_rgb(24, 28, 38)),
+                    );
+                    painter.text(
+                        egui::pos2(x, rect.bottom() - 4.0),
+                        egui::Align2::CENTER_BOTTOM,
+                        label,
+                        egui::FontId::monospace(10.0),
+                        Color32::from_gray(105),
+                    );
+                }
+
+                // Horizontal dB lines
                 for db_line in [-12.0, -6.0, 0.0, 6.0, 12.0] {
-                    let y = rect.center().y - (db_line as f32 / db_range as f32) * (rect.height() * 0.45);
-                    let stroke_col = if db_line == 0.0 { Color32::from_gray(80) } else { Color32::from_gray(35) };
-                    painter.line_segment([egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)], Stroke::new(1.0, stroke_col));
+                    let y = plot_mid_y - (db_line as f32 / db_range as f32) * plot_half_h;
+                    let stroke_col = if db_line == 0.0 {
+                        Color32::from_rgb(70, 80, 100)
+                    } else {
+                        Color32::from_rgb(26, 30, 40)
+                    };
+                    painter.line_segment(
+                        [egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
+                        Stroke::new(1.0, stroke_col),
+                    );
                     painter.text(
                         egui::pos2(rect.left() + 6.0, y - 2.0),
                         egui::Align2::LEFT_BOTTOM,
                         format!("{:+.0}dB", db_line),
                         egui::FontId::monospace(10.0),
-                        Color32::from_gray(110),
+                        Color32::from_gray(115),
                     );
                 }
 
                 // Frequency curve points
-                let num_pts = 160usize;
+                let num_pts = 180usize;
                 let mut pts = Vec::with_capacity(num_pts);
                 for i in 0..num_pts {
                     let t = i as f64 / (num_pts - 1) as f64;
-                    let freq = 20.0 * (1000.0_f64).powf(t); // 20 Hz to 20,000 Hz log scale
+                    let freq = 20.0 * (1000.0_f64).powf(t);
                     let db = self.eq_config.response_db(freq, 48000.0).clamp(-db_range, db_range);
                     let x = rect.left() + (t as f32) * rect.width();
-                    let y = rect.center().y - (db as f32 / db_range as f32) * (rect.height() * 0.45);
+                    let y = plot_mid_y - (db as f32 / db_range as f32) * plot_half_h;
                     pts.push(egui::pos2(x, y));
                 }
                 let curve_col = if self.eq_config.enabled { ACCENT } else { Color32::from_gray(110) };
-                painter.add(egui::Shape::line(pts, Stroke::new(2.2, curve_col)));
+                painter.add(egui::Shape::line(pts, Stroke::new(2.4, curve_col)));
+
+                // Active band node markers on curve
+                for (idx, b) in self.eq_config.bands.iter().enumerate() {
+                    if !b.enabled {
+                        continue;
+                    }
+                    let f = b.freq.clamp(20.0, 20000.0);
+                    let t = ((f / 20.0).ln() / 1000.0_f64.ln()) as f32;
+                    let db = self.eq_config.response_db(f, 48000.0).clamp(-db_range, db_range);
+                    let x = rect.left() + t * rect.width();
+                    let y = plot_mid_y - (db as f32 / db_range as f32) * plot_half_h;
+                    let dot_col = if self.eq_config.enabled { GOLD } else { Color32::from_gray(130) };
+                    painter.circle_filled(egui::pos2(x, y), 4.5, dot_col);
+                    painter.text(
+                        egui::pos2(x, y - 7.0),
+                        egui::Align2::CENTER_BOTTOM,
+                        format!("{}", idx + 1),
+                        egui::FontId::proportional(10.0),
+                        dot_col,
+                    );
+                }
 
                 ui.add_space(6.0);
 
@@ -1208,9 +1318,9 @@ impl App {
                     egui::Grid::new("peq_bands_grid")
                         .striped(true)
                         .num_columns(7)
-                        .spacing([10.0, 6.0])
+                        .spacing([12.0, 6.0])
                         .show(ui, |ui| {
-                            for h in ["Bật", "Loại Filter", "Tần số Fc (Hz)", "Gain (dB)", "Hệ số Q", "Thanh trượt Gain", "Xóa"] {
+                            for h in ["Dải", "Bộ lọc", "Tần số (Fc)", "Biên độ (Gain)", "Hệ số Q", "Thanh trượt Gain", "Xóa"] {
                                 ui.label(RichText::new(h).strong().color(DIM));
                             }
                             ui.end_row();
@@ -1221,7 +1331,7 @@ impl App {
                                 }
                                 egui::ComboBox::from_id_salt(format!("ft_{idx}"))
                                     .selected_text(band.filter_type.code())
-                                    .width(75.0)
+                                    .width(80.0)
                                     .show_ui(ui, |ui| {
                                         for &ft in FilterType::ALL {
                                             if ui.selectable_value(&mut band.filter_type, ft, ft.label()).changed() {
@@ -1247,7 +1357,7 @@ impl App {
                                 {
                                     changed = true;
                                 }
-                                ui.spacing_mut().slider_width = 150.0;
+                                ui.spacing_mut().slider_width = 160.0;
                                 if ui.add(egui::Slider::new(&mut band.gain_db, -15.0..=15.0).show_value(false)).changed() {
                                     changed = true;
                                 }
@@ -1264,8 +1374,8 @@ impl App {
                 });
 
                 ui.add_space(6.0);
-                ui.collapsing("📋 Dán / Xuất cấu hình chuẩn Peace EQ & AutoEQ (ParametricEQ.txt)", |ui| {
-                    ui.label(RichText::new("Dán nội dung ParametricEQ.txt từ AutoEQ.app vào ô dưới rồi bấm 'Áp dụng Text':").small().color(DIM));
+                ui.collapsing("📋 Nhập / Xuất cấu hình AutoEQ (ParametricEQ.txt)", |ui| {
+                    ui.label(RichText::new("Dán cấu hình ParametricEQ.txt vào ô dưới rồi bấm 'Áp dụng cấu hình':").small().color(DIM));
                     ui.add(
                         egui::TextEdit::multiline(&mut self.eq_import_text)
                             .font(egui::TextStyle::Monospace)
@@ -1273,13 +1383,13 @@ impl App {
                             .desired_width(f32::INFINITY),
                     );
                     ui.horizontal(|ui| {
-                        if ui.button("✔ Áp dụng Text AutoEQ").clicked() {
+                        if ui.button("✔ Áp dụng cấu hình").clicked() {
                             let parsed = EqConfig::from_autoeq_text("Custom AutoEQ", &self.eq_import_text);
                             self.eq_config = parsed;
                             self.eq_config.enabled = true;
                             changed = true;
                         }
-                        if ui.button("📋 Copy cấu hình hiện tại").clicked() {
+                        if ui.button("📋 Sao chép cấu hình hiện tại").clicked() {
                             ui.ctx().copy_text(self.eq_config.to_autoeq_text());
                         }
                     });

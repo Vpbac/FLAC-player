@@ -15,7 +15,7 @@ public struct ParametricEQView: View {
                             .fontWeight(.semibold)
                     }
 
-                    Picker("Preset AutoEQ", selection: $eq.presetName) {
+                    Picker("Preset", selection: $eq.presetName) {
                         ForEach(eq.builtinPresets, id: \.name) { item in
                             Text(item.name).tag(item.name)
                         }
@@ -32,14 +32,14 @@ public struct ParametricEQView: View {
                     }) {
                         HStack {
                             Image(systemName: "doc.text.fill")
-                            Text("Dán / Xuất cấu hình Peace EQ (ParametricEQ.txt)")
+                            Text("Nhập / Xuất cấu hình AutoEQ (ParametricEQ.txt)")
                         }
                     }
                 }
 
-                Section(header: Text("Đồ Thị Đáp Tuyến Tần Số (20Hz - 20kHz)")) {
+                Section(header: Text("Đáp Tuyến Tần Số (20Hz – 20kHz)")) {
                     EqCurveGraphView(eq: eq)
-                        .frame(height: 130)
+                        .frame(height: 155)
                         .padding(.vertical, 4)
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -60,7 +60,7 @@ public struct ParametricEQView: View {
                     Button(action: {
                         eq.bands.append(EqBand(enabled: true, filterType: .peaking, freq: 1000, gainDb: 0, q: 1.41))
                     }) {
-                        Label("Thêm Band", systemImage: "plus.circle.fill")
+                        Label("Thêm Dải", systemImage: "plus.circle.fill")
                             .font(.caption)
                     }
                 }) {
@@ -107,7 +107,7 @@ public struct ParametricEQView: View {
             .sheet(isPresented: $showImportSheet) {
                 NavigationView {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("Dán nội dung file ParametricEQ.txt từ AutoEQ.app hoặc Peace EQ:")
+                        Text("Dán nội dung file ParametricEQ.txt chuẩn AutoEQ vào ô dưới:")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
 
@@ -147,8 +147,19 @@ struct EqCurveGraphView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(red: 0.07, green: 0.08, blue: 0.11))
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(red: 0.05, green: 0.06, blue: 0.09))
+
+                // Horizontal dB grid lines
+                Path { path in
+                    let dbRange = 18.0
+                    for dbLine in [-12.0, -6.0, 0.0, 6.0, 12.0] {
+                        let y = (geo.size.height / 2) - CGFloat(dbLine / dbRange) * (geo.size.height * 0.42)
+                        path.move(to: CGPoint(x: 0, y: y))
+                        path.addLine(to: CGPoint(x: geo.size.width, y: y))
+                    }
+                }
+                .stroke(Color.gray.opacity(0.22), lineWidth: 1)
 
                 // 0 dB center line
                 Path { path in
@@ -156,18 +167,18 @@ struct EqCurveGraphView: View {
                     path.move(to: CGPoint(x: 0, y: midY))
                     path.addLine(to: CGPoint(x: geo.size.width, y: midY))
                 }
-                .stroke(Color.gray.opacity(0.4), lineWidth: 1)
+                .stroke(Color.gray.opacity(0.45), lineWidth: 1)
 
                 // Response curve
                 Path { path in
-                    let steps = 100
+                    let steps = 120
                     let dbRange = 18.0
                     for i in 0..<steps {
                         let t = Double(i) / Double(steps - 1)
                         let freq = 20.0 * pow(1000.0, t)
                         let db = min(max(eq.responseDb(at: freq), -dbRange), dbRange)
                         let x = CGFloat(t) * geo.size.width
-                        let y = (geo.size.height / 2) - CGFloat(db / dbRange) * (geo.size.height * 0.44)
+                        let y = (geo.size.height / 2) - CGFloat(db / dbRange) * (geo.size.height * 0.42)
                         if i == 0 {
                             path.move(to: CGPoint(x: x, y: y))
                         } else {
@@ -175,7 +186,7 @@ struct EqCurveGraphView: View {
                         }
                     }
                 }
-                .stroke(eq.isEnabled ? Color.accentColor : Color.gray, lineWidth: 2.2)
+                .stroke(eq.isEnabled ? Color.accentColor : Color.gray, lineWidth: 2.5)
             }
         }
     }
