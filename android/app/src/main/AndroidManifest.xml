@@ -10,7 +10,9 @@
 
     <application
         android:allowBackup="true"
-        android:label="Hi-Res FLAC &amp; AutoEQ"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="Hi-Res Audio"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.AppCompat.NoActionBar">

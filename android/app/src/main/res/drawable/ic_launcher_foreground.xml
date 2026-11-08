@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Dark Vinyl / DAC Dial Disc -->
+    <path
+        android:fillColor="#10131C"
+        android:pathData="M54,54m-31,0a31,31 0,1 1,62 0a31,31 0,1 1,-62 0" />
+
+    <!-- Metallic Champagne-Gold Hi-Res Outer Ring -->
+    <path
+        android:strokeWidth="2.8"
+        android:pathData="M54,54m-31,0a31,31 0,1 1,62 0a31,31 0,1 1,-62 0">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:startX="23"
+                android:startY="23"
+                android:endX="85"
+                android:endY="85"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#FFE484" />
+                <item android:offset="0.5" android:color="#F5C542" />
+                <item android:offset="1.0" android:color="#B38412" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Subtle Inner Vinyl Groove Ring -->
+    <path
+        android:strokeColor="#263044"
+        android:strokeWidth="1.0"
+        android:pathData="M54,54m-25,0a25,25 0,1 1,50 0a25,25 0,1 1,-50 0" />
+
+    <!-- Glowing Cyan Harmonic Equalizer Bars -->
+    <path
+        android:strokeColor="#4CC2FF"
+        android:strokeWidth="3.6"
+        android:strokeLineCap="round"
+        android:pathData="M36,58 L36,50" />
+    <path
+        android:strokeColor="#4CC2FF"
+        android:strokeWidth="3.6"
+        android:strokeLineCap="round"
+        android:pathData="M43,63 L43,43" />
+    <path
+        android:strokeColor="#64D2FF"
+        android:strokeWidth="3.8"
+        android:strokeLineCap="round"
+        android:pathData="M50,68 L50,36" />
+    <path
+        android:strokeColor="#F5C542"
+        android:strokeWidth="3.8"
+        android:strokeLineCap="round"
+        android:pathData="M57,65 L57,40" />
+    <path
+        android:strokeColor="#64D2FF"
+        android:strokeWidth="3.6"
+        android:strokeLineCap="round"
+        android:pathData="M64,61 L64,46" />
+    <path
+        android:strokeColor="#4CC2FF"
+        android:strokeWidth="3.6"
+        android:strokeLineCap="round"
+        android:pathData="M71,57 L71,51" />
+
+    <!-- Smooth Parametric EQ Curve Overlay -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M31,56 C38,56 44,39 51,39 C58,39 60,49 66,47 C71,45 74,42 77,42" />
+
+    <!-- Gold EQ Node Dots -->
+    <path
+        android:fillColor="#F5C542"
+        android:pathData="M51,39m-2.3,0a2.3,2.3 0,1 1,4.6 0a2.3,2.3 0,1 1,-4.6 0" />
+    <path
+        android:fillColor="#4CC2FF"
+        android:pathData="M66,47m-2.1,0a2.1,2.1 0,1 1,4.2 0a2.1,2.1 0,1 1,-4.2 0" />
+</vector>

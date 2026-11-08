@@ -19,6 +19,7 @@ use tiny_http::{Header, Response, Server, StatusCode};
 use crate::library::{self, TrackInfo};
 
 const INDEX_HTML: &str = include_str!("web/index.html");
+const ICON_PNG: &[u8] = include_bytes!("../assets/icon.png");
 
 #[allow(dead_code)]
 pub struct ServerHandle {
@@ -81,6 +82,15 @@ pub fn start_server(playlist: Arc<Mutex<Vec<TrackInfo>>>, port: u16) -> Result<S
                 if url == "/" || url == "/index.html" || url.starts_with("/?") {
                     let mut resp = Response::from_string(INDEX_HTML);
                     resp.add_header(Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=utf-8"[..]).unwrap());
+                    resp.add_header(Header::from_bytes(&b"Cache-Control"[..], &b"public, max-age=604800"[..]).unwrap());
+                    resp.add_header(cors);
+                    let _ = request.respond(resp);
+                    continue;
+                }
+
+                if url == "/icon.png" || url == "/favicon.ico" {
+                    let mut resp = Response::from_data(ICON_PNG);
+                    resp.add_header(Header::from_bytes(&b"Content-Type"[..], &b"image/png"[..]).unwrap());
                     resp.add_header(Header::from_bytes(&b"Cache-Control"[..], &b"public, max-age=604800"[..]).unwrap());
                     resp.add_header(cors);
                     let _ = request.respond(resp);
