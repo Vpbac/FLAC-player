@@ -1,5 +1,11 @@
 import SwiftUI
 
+struct ItemTrack: Identifiable {
+    var id: String { track.id }
+    let index: Int
+    let track: Track
+}
+
 public struct TrackListView: View {
     @ObservedObject var server = ServerManager.shared
     @ObservedObject var player = AudioPlayerManager.shared
@@ -7,16 +13,16 @@ public struct TrackListView: View {
     @State private var showSettings: Bool = false
     @State private var showNowPlaying: Bool = false
 
-    var filteredTracks: [(Int, Track)] {
-        let enumerated = Array(server.tracks.enumerated())
-        if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
-            return enumerated
+    var filteredTracks: [ItemTrack] {
+        let all = server.tracks.enumerated().map { ItemTrack(index: $0.offset, track: $0.element) }
+        let q = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        if q.isEmpty {
+            return all
         }
-        let q = searchText.lowercased()
-        return enumerated.filter { _, t in
-            t.title.lowercased().contains(q) ||
-            t.artist.lowercased().contains(q) ||
-            t.album.lowercased().contains(q)
+        return all.filter { item in
+            item.track.title.lowercased().contains(q) ||
+            item.track.artist.lowercased().contains(q) ||
+            item.track.album.lowercased().contains(q)
         }
     }
 
@@ -65,15 +71,15 @@ public struct TrackListView: View {
                         }
                     } else {
                         List {
-                            ForEach(filteredTracks, id: \.1.id) { index, track in
+                            ForEach(filteredTracks) { item in
                                 TrackRowView(
-                                    track: track,
-                                    index: index,
-                                    isPlayingThis: player.currentTrack?.id == track.id && player.isPlaying
+                                    track: item.track,
+                                    index: item.index,
+                                    isPlayingThis: player.currentTrack?.id == item.track.id && player.isPlaying
                                 )
                                 .contentShape(Rectangle())
                                 .onTapGesture {
-                                    player.play(track: track, index: index)
+                                    player.play(track: item.track, index: item.index)
                                 }
                             }
                             .listRowBackground(Color(red: 0.11, green: 0.12, blue: 0.15))

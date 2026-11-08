@@ -59,7 +59,7 @@ public struct NowPlayingView: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
 
-                    Text(player.currentTrack?.artist.isEmpty == false ? player.currentTrack!.artist : "Nghệ sĩ chưa rõ")
+                    Text(player.currentTrack?.artist.isEmpty == false ? (player.currentTrack?.artist ?? "") : "Nghệ sĩ chưa rõ")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.accentColor)
                         .lineLimit(1)
