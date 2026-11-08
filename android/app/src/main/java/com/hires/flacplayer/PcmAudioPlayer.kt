@@ -1,10 +1,13 @@
 package com.hires.flacplayer
 
+import android.content.Context
 import android.media.*
+import android.net.Uri
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 class PcmAudioPlayer(
+    private val context: Context,
     private val onProgress: (Double, Double) -> Unit,
     private val onTrackEnded: () -> Unit
 ) {
@@ -19,7 +22,7 @@ class PcmAudioPlayer(
     private val pauseFlag = AtomicBoolean(false)
     private val seekTargetUs = AtomicLong(-1L)
 
-    fun play(pathOrUrl: String) {
+    fun play(pathOrUri: String) {
         stop()
         stopFlag.set(false)
         pauseFlag.set(false)
@@ -27,9 +30,9 @@ class PcmAudioPlayer(
         isPlaying = true
 
         decodeThread = Thread {
-            runDecodeLoop(pathOrUrl)
+            runDecodeLoop(pathOrUri)
         }.apply {
-            name = "HiRes-FLAC-DSP"
+            name = "HiRes-FLAC-DSP-LOS23"
             priority = Thread.MAX_PRIORITY
             start()
         }
@@ -58,13 +61,18 @@ class PcmAudioPlayer(
         decodeThread = null
     }
 
-    private fun runDecodeLoop(pathOrUrl: String) {
+    private fun runDecodeLoop(pathOrUri: String) {
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
         var audioTrack: AudioTrack? = null
 
         try {
-            extractor.setDataSource(pathOrUrl)
+            if (pathOrUri.startsWith("content://")) {
+                extractor.setDataSource(context, Uri.parse(pathOrUri), null)
+            } else {
+                extractor.setDataSource(pathOrUri)
+            }
+
             var audioTrackIdx = -1
             var format: MediaFormat? = null
             for (i in 0 until extractor.trackCount) {
@@ -95,14 +103,24 @@ class PcmAudioPlayer(
             fun buildAudioTrack(sr: Int, ch: Int): AudioTrack {
                 val chOut = if (ch == 1) AudioFormat.CHANNEL_OUT_MONO else AudioFormat.CHANNEL_OUT_STEREO
                 val minBuf = AudioTrack.getMinBufferSize(sr, chOut, AudioFormat.ENCODING_PCM_FLOAT).coerceAtLeast(8192)
-                return AudioTrack(
-                    AudioManager.STREAM_MUSIC,
-                    sr,
-                    chOut,
-                    AudioFormat.ENCODING_PCM_FLOAT,
-                    minBuf * 2,
-                    AudioTrack.MODE_STREAM
-                ).apply { play() }
+                return AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build()
+                    )
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
+                            .setSampleRate(sr)
+                            .setChannelMask(chOut)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(minBuf * 2)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+                    .apply { play() }
             }
 
             audioTrack = buildAudioTrack(sampleRate, channels)

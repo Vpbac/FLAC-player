@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build-android:
-    name: Build Android APK (Sony XZ1 LineageOS 15)
+    name: Build Android APK (Sony XZ1 LineageOS Android 15)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository

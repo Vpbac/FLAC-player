@@ -2,14 +2,16 @@ package com.hires.flacplayer
 
 import android.Manifest
 import android.app.AlertDialog
+import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
+import android.database.ContentObserver
 import android.graphics.*
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.provider.MediaStore
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
@@ -29,7 +31,7 @@ import kotlin.math.pow
 data class AudioItem(
     val title: String,
     val artist: String,
-    val pathOrUrl: String,
+    val pathOrUri: String,
     val formatBadge: String,
     val durationSec: Double,
     val isOfflineSaved: Boolean = true
@@ -57,7 +59,8 @@ class MainActivity : AppCompatActivity() {
     private var isUserSeeking = false
 
     private var pcServerUrl: String = "http://192.168.1.10:8080"
-    private val knownLocalPaths = HashSet<String>()
+    private val knownTrackKeys = HashSet<String>()
+    private var mediaObserver: ContentObserver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,6 +78,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         pcmPlayer = PcmAudioPlayer(
+            context = applicationContext,
             onProgress = { pos, dur ->
                 uiHandler.post {
                     if (!isUserSeeking && dur > 0) {
@@ -91,7 +95,8 @@ class MainActivity : AppCompatActivity() {
         pcmPlayer.eqProcessor.updateConfig(eqConfig)
 
         buildDarkHiResUI()
-        requestStoragePermissionIfNeeded()
+        registerMediaStoreWatcher()
+        requestAudioPermissionAndScan()
         startAutoFolderAndServerWatcher()
     }
 
@@ -110,8 +115,8 @@ class MainActivity : AppCompatActivity() {
             setPadding(32, 24, 32, 24)
         }
         val titleTv = TextView(this).apply {
-            text = "◉ Hi-Res FLAC (XZ1)"
-            textSize = 18f
+            text = "◉ Hi-Res FLAC (XZ1 A15)"
+            textSize = 17f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.parseColor("#4CC2FF"))
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -136,7 +141,7 @@ class MainActivity : AppCompatActivity() {
 
         // Status Banner
         statusBanner = TextView(this).apply {
-            text = "🔄 Tự động nhận nhạc từ bộ nhớ máy / thẻ nhớ SD & PC Offline..."
+            text = "🔄 Tự động quét nhạc trên Sony XZ1 (Android 15) & đồng bộ Offline từ PC..."
             textSize = 12f
             setTextColor(Color.parseColor("#3DD68C"))
             setBackgroundColor(Color.parseColor("#18221F"))
@@ -175,7 +180,7 @@ class MainActivity : AppCompatActivity() {
                     setPadding(36, 22, 36, 22)
                 }
                 row.removeAllViews()
-                val active = (currentIndex in allTracks.indices && allTracks[currentIndex].pathOrUrl == item.pathOrUrl)
+                val active = (currentIndex in allTracks.indices && allTracks[currentIndex].pathOrUri == item.pathOrUri)
                 row.setBackgroundColor(if (active) Color.parseColor("#18283A") else Color.TRANSPARENT)
 
                 val t1 = TextView(this@MainActivity).apply {
@@ -198,7 +203,7 @@ class MainActivity : AppCompatActivity() {
         listView.adapter = listAdapter
         listView.setOnItemClickListener { _, _, pos, _ ->
             val chosen = filteredTracks[pos]
-            val idx = allTracks.indexOfFirst { it.pathOrUrl == chosen.pathOrUrl }
+            val idx = allTracks.indexOfFirst { it.pathOrUri == chosen.pathOrUri }
             if (idx >= 0) playIndex(idx)
         }
         root.addView(listView)
@@ -278,7 +283,7 @@ class MainActivity : AppCompatActivity() {
         nowPlayingTitle.text = "♫ ${item.title} (${item.formatBadge})"
         playPauseBtn.text = "⏸ Tạm dừng"
         listAdapter.notifyDataSetChanged()
-        pcmPlayer.play(item.pathOrUrl)
+        pcmPlayer.play(item.pathOrUri)
     }
 
     private fun playNext() {
@@ -420,7 +425,7 @@ class MainActivity : AppCompatActivity() {
         scroll.addView(container)
 
         AlertDialog.Builder(this)
-            .setTitle("🎚 Parametric EQ (Sony XZ1)")
+            .setTitle("🎚 Parametric EQ (Sony XZ1 Android 15)")
             .setView(scroll)
             .setPositiveButton("✔ Áp dụng") { _, _ ->
                 syncChangesFromText(eqConfig.name, enableSwitch.isChecked)
@@ -454,17 +459,28 @@ class MainActivity : AppCompatActivity() {
                 getSharedPreferences("flac_xz1_prefs", Context.MODE_PRIVATE).edit()
                     .putString("pc_url", pcServerUrl)
                     .apply()
-                syncFromPcServerAsync()
+                Thread { syncFromPcServerAsync() }.start()
             }
             .setNegativeButton("Đóng", null)
             .show()
     }
 
-    // ---------------- Automatic Folder Watcher & PC Offline Sync ----------------
+    // ---------------- Android 15 MediaStore Watcher & PC Offline Sync ----------------
+    private fun registerMediaStoreWatcher() {
+        val observer = object : ContentObserver(uiHandler) {
+            override fun onChange(selfChange: Boolean) {
+                super.onChange(selfChange)
+                Thread { scanMediaStoreAndOfflineIncremental() }.start()
+            }
+        }
+        contentResolver.registerContentObserver(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, true, observer)
+        mediaObserver = observer
+    }
+
     private fun startAutoFolderAndServerWatcher() {
         Thread {
             while (!isFinishing) {
-                scanLocalFoldersIncremental()
+                scanMediaStoreAndOfflineIncremental()
                 syncFromPcServerAsync()
                 try {
                     Thread.sleep(3000)
@@ -473,34 +489,76 @@ class MainActivity : AppCompatActivity() {
         }.apply { isDaemon = true; start() }
     }
 
-    private fun scanLocalFoldersIncremental() {
-        val exts = setOf("flac", "wav", "mp3", "m4a", "alac", "ogg", "aac")
-        val dirsToWatch = mutableListOf<File>()
-        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)?.let { dirsToWatch.add(it) }
-        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)?.let { dirsToWatch.add(it) }
-        val offlineDir = File(filesDir, "OfflineAudio").apply { mkdirs() }
-        dirsToWatch.add(offlineDir)
-
+    @Synchronized
+    private fun scanMediaStoreAndOfflineIncremental() {
         val newlyFound = mutableListOf<AudioItem>()
-        for (root in dirsToWatch) {
-            if (!root.exists() || !root.isDirectory) continue
-            root.walkTopDown().maxDepth(4).forEach { f ->
-                if (f.isFile && f.length() > 0) {
-                    val ext = f.extension.lowercase()
-                    if (ext in exts && !knownLocalPaths.contains(f.absolutePath)) {
-                        knownLocalPaths.add(f.absolutePath)
-                        newlyFound.add(
-                            AudioItem(
-                                title = f.nameWithoutExtension,
-                                artist = f.parentFile?.name ?: "Local Storage",
-                                pathOrUrl = f.absolutePath,
-                                formatBadge = ext.uppercase(),
-                                durationSec = 0.0,
-                                isOfflineSaved = true
+
+        // 1. Scan Android 15 MediaStore (covers Internal Storage + microSD card on Sony XZ1)
+        val perm = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
+        if (ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED) {
+            val projection = arrayOf(
+                MediaStore.Audio.Media._ID,
+                MediaStore.Audio.Media.TITLE,
+                MediaStore.Audio.Media.ARTIST,
+                MediaStore.Audio.Media.DURATION,
+                MediaStore.Audio.Media.DISPLAY_NAME,
+                MediaStore.Audio.Media.MIME_TYPE
+            )
+            try {
+                contentResolver.query(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    projection,
+                    null,
+                    null,
+                    "${MediaStore.Audio.Media.DATE_ADDED} DESC"
+                )?.use { cursor ->
+                    val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                    val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
+                    val artistCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
+                    val durCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
+                    val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
+
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idCol)
+                        val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id).toString()
+                        if (!knownTrackKeys.contains(contentUri)) {
+                            knownTrackKeys.add(contentUri)
+                            val displayName = cursor.getString(nameCol) ?: ""
+                            val ext = displayName.substringAfterLast('.', "FLAC").uppercase()
+                            val rawTitle = cursor.getString(titleCol) ?: displayName.substringBeforeLast('.')
+                            val rawArtist = cursor.getString(artistCol) ?: "Sony XZ1 Storage"
+                            val durMs = cursor.getLong(durCol)
+                            newlyFound.add(
+                                AudioItem(
+                                    title = rawTitle,
+                                    artist = if (rawArtist == "<unknown>") "Hi-Res Audio" else rawArtist,
+                                    pathOrUri = contentUri,
+                                    formatBadge = ext,
+                                    durationSec = durMs.toDouble() / 1000.0,
+                                    isOfflineSaved = true
+                                )
                             )
-                        )
+                        }
                     }
                 }
+            } catch (_: Exception) {}
+        }
+
+        // 2. Scan app-private OfflineAudio folder (downloaded from PC)
+        val offlineDir = File(filesDir, "OfflineAudio").apply { mkdirs() }
+        offlineDir.listFiles()?.forEach { f ->
+            if (f.isFile && f.length() > 0 && !knownTrackKeys.contains(f.absolutePath)) {
+                knownTrackKeys.add(f.absolutePath)
+                newlyFound.add(
+                    AudioItem(
+                        title = f.nameWithoutExtension.substringBeforeLast('_'),
+                        artist = "Đã lưu từ PC",
+                        pathOrUri = f.absolutePath,
+                        formatBadge = f.extension.uppercase(),
+                        durationSec = 0.0,
+                        isOfflineSaved = true
+                    )
+                )
             }
         }
 
@@ -508,7 +566,7 @@ class MainActivity : AppCompatActivity() {
             uiHandler.post {
                 allTracks.addAll(newlyFound)
                 filterPlaylist()
-                statusBanner.text = "✔ Tự động nhận ${allTracks.size} bài nhạc Offline (Tắt PC vẫn nghe được)"
+                statusBanner.text = "✔ Đã nhận ${allTracks.size} bài nhạc Offline trên Sony XZ1 (Tắt PC vẫn nghe được)"
             }
         }
     }
@@ -544,12 +602,12 @@ class MainActivity : AppCompatActivity() {
                         targetFile.outputStream().use { output -> input.copyTo(output) }
                     }
                 }
-                if (targetFile.exists() && targetFile.length() > 0 && !knownLocalPaths.contains(targetFile.absolutePath)) {
-                    knownLocalPaths.add(targetFile.absolutePath)
+                if (targetFile.exists() && targetFile.length() > 0 && !knownTrackKeys.contains(targetFile.absolutePath)) {
+                    knownTrackKeys.add(targetFile.absolutePath)
                     val item = AudioItem(
                         title = title,
                         artist = artist,
-                        pathOrUrl = targetFile.absolutePath,
+                        pathOrUri = targetFile.absolutePath,
                         formatBadge = "${ext.uppercase()} ${bits}bit/${sr}kHz",
                         durationSec = obj.optDouble("duration", 0.0),
                         isOfflineSaved = true
@@ -564,7 +622,7 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Exception) {}
     }
 
-    private fun requestStoragePermissionIfNeeded() {
+    private fun requestAudioPermissionAndScan() {
         val perms = if (Build.VERSION.SDK_INT >= 33) {
             arrayOf(Manifest.permission.READ_MEDIA_AUDIO)
         } else {
@@ -572,6 +630,15 @@ class MainActivity : AppCompatActivity() {
         }
         if (ContextCompat.checkSelfPermission(this, perms[0]) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, perms, 101)
+        } else {
+            Thread { scanMediaStoreAndOfflineIncremental() }.start()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 101 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            Thread { scanMediaStoreAndOfflineIncremental() }.start()
         }
     }
 
@@ -582,6 +649,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        mediaObserver?.let { contentResolver.unregisterContentObserver(it) }
         pcmPlayer.stop()
     }
 }
