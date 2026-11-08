@@ -22,6 +22,14 @@ public class ServerManager: ObservableObject {
         let saved = UserDefaults.standard.string(forKey: "saved_server_url") ?? "http://192.168.1.10:8080"
         self.serverURLString = saved
         testConnection()
+
+        Timer.publish(every: 3.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self, self.isConnected else { return }
+                self.fetchTracksQuietly()
+            }
+            .store(in: &cancellables)
     }
 
     public var cleanBaseURL: String {
@@ -86,6 +94,25 @@ public class ServerManager: ObservableObject {
             }, receiveValue: { [weak self] fetched in
                 self?.tracks = fetched
                 self?.errorMessage = nil
+            })
+            .store(in: &cancellables)
+    }
+
+    public func fetchTracksQuietly() {
+        guard let url = URL(string: "\(cleanBaseURL)/api/tracks") else { return }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 4.0
+
+        URLSession.shared.dataTaskPublisher(for: request)
+            .map { $0.data }
+            .decode(type: [Track].self, decoder: JSONDecoder())
+            .receive(on: DispatchQueue.main)
+            .sink(receiveCompletion: { _ in }, receiveValue: { [weak self] fetched in
+                guard let self = self else { return }
+                if self.tracks != fetched {
+                    self.tracks = fetched
+                }
             })
             .store(in: &cancellables)
     }
