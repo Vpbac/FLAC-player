@@ -33,9 +33,7 @@ public struct TrackListView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    if !server.isConnected {
-                        ConnectionBannerView(showSettings: $showSettings)
-                    }
+                    ConnectionBannerView(showSettings: $showSettings)
 
                     if server.tracks.isEmpty {
                         VStack(spacing: 16) {
@@ -123,23 +121,42 @@ public struct TrackListView: View {
 }
 
 struct ConnectionBannerView: View {
+    @ObservedObject var server = ServerManager.shared
     @Binding var showSettings: Bool
 
     var body: some View {
+        let savedCount = server.tracks.filter { server.cachedPaths.contains($0.path) }.count
+        let total = server.tracks.count
         HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(.yellow)
-            Text("Chưa kết nối PC. Chạm để cài đặt IP.")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white)
+            Image(systemName: server.isConnected ? "checkmark.icloud.fill" : "internaldrive.fill")
+                .foregroundColor(server.isConnected ? .green : .yellow)
+            if server.isConnected {
+                if total == 0 {
+                    Text("Đã kết nối PC • Thêm nhạc vào PC để tự lưu về iPhone")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white)
+                } else if savedCount >= total {
+                    Text("✔ Đã lưu Offline \(savedCount)/\(total) bài (Tắt PC vẫn nghe được)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.green)
+                } else {
+                    Text("📥 Đang tự lưu nhạc vào bộ nhớ iPhone: \(savedCount)/\(total) bài...")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white)
+                }
+            } else {
+                Text("📴 PC đang tắt (Offline) • Nghe trực tiếp \(savedCount)/\(total) bài đã lưu")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.yellow)
+            }
             Spacer()
             Image(systemName: "chevron.right")
                 .foregroundColor(.gray)
                 .font(.system(size: 12))
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Color.red.opacity(0.85))
+        .padding(.vertical, 8)
+        .background(Color(red: 0.14, green: 0.17, blue: 0.21))
         .onTapGesture {
             showSettings = true
         }
